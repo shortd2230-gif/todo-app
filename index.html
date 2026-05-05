@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ToDo・進捗管理</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:sans-serif;max-width:400px;margin:0 auto;padding:12px;background:#fff;color:#333;font-size:14px}
+.tab-bar{display:flex;border-bottom:1px solid #eee;margin-bottom:14px;position:sticky;top:0;background:#fff;z-index:10}
+.tab{flex:1;padding:10px 4px;font-size:13px;font-weight:bold;text-align:center;cursor:pointer;color:#999;border-bottom:2px solid transparent}
+.tab.on{color:#0f766e;border-bottom-color:#0f766e}
+.pane{display:none}
+.pane.on{display:block}
+.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
+.stat{background:#f5f5f5;border-radius:10px;padding:12px;text-align:center}
+.stat-num{font-size:24px;font-weight:bold;color:#333}
+.stat-label{font-size:11px;color:#888;margin-top:2px}
+.progress-wrap{margin-bottom:14px}
+.progress-label{display:flex;justify-content:space-between;font-size:12px;color:#666;margin-bottom:4px}
+.progress-bar{height:14px;background:#e5e7eb;border-radius:7px;overflow:hidden}
+.progress-fill{height:100%;background:#0f766e;border-radius:7px;transition:width .4s}
+.section-label{font-size:11px;font-weight:bold;color:#888;margin:12px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+.add-area{background:#f5f5f5;border-radius:10px;padding:10px;margin-bottom:12px}
+.add-row{display:flex;gap:6px;margin-bottom:8px}
+.add-row input{flex:1;border:1px solid #ddd;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;color:#333;font-family:sans-serif}
+.add-row input:focus{outline:none;border-color:#0f766e}
+.add-btn{padding:8px 14px;background:#0f766e;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:bold;cursor:pointer;white-space:nowrap}
+.cat-row{display:flex;gap:5px;flex-wrap:wrap}
+.cat-chip{padding:4px 10px;border-radius:12px;border:1px solid #ddd;background:#fff;font-size:11px;cursor:pointer;color:#666}
+.cat-chip.on{background:#0f766e;border-color:#0f766e;color:#fff}
+.task-item{padding:10px 0;border-bottom:1px solid #f0f0f0}
+.task-item:last-child{border-bottom:none}
+.task-top{display:flex;align-items:flex-start;gap:8px}
+.task-check{width:22px;height:22px;border-radius:50%;border:2px solid #ccc;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#fff;margin-top:1px}
+.task-check.done{background:#0f766e;border-color:#0f766e}
+.task-check.done::after{content:'';display:block;width:5px;height:9px;border:2px solid #fff;border-top:none;border-left:none;transform:rotate(45deg) translate(-1px,-1px)}
+.task-main{flex:1}
+.task-text{font-size:13px;color:#333;line-height:1.5}
+.task-text.done{text-decoration:line-through;color:#aaa}
+.task-meta{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap}
+.task-cat{font-size:10px;padding:2px 7px;border-radius:8px;white-space:nowrap}
+.task-deadline{font-size:11px;color:#888}
+.task-deadline.overdue{color:#dc2626;font-weight:bold}
+.task-deadline.soon{color:#f97316;font-weight:bold}
+.task-del{width:26px;height:26px;border:none;background:none;color:#ccc;cursor:pointer;font-size:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:4px}
+.task-del:hover{background:#f5f5f5;color:#999}
+.empty{text-align:center;color:#aaa;font-size:13px;padding:24px 0}
+.filter-row{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal-title{font-size:15px;font-weight:bold;color:#333}
+.cal-nav{padding:6px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;color:#333}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px}
+.cal-day-head{text-align:center;font-size:11px;color:#888;padding:4px 0}
+.cal-day{text-align:center;padding:5px 2px;font-size:12px;border-radius:8px;cursor:pointer;color:#333;border:1px solid transparent;min-height:34px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px}
+.cal-day:hover{background:#f5f5f5}
+.cal-day.today{background:#f5f5f5;border-color:#0f766e;font-weight:bold;color:#0f766e}
+.cal-day.selected{background:#0f766e;color:#fff}
+.cal-day.selected .dot{background:#fff}
+.cal-day.empty-cell{cursor:default}
+.dot{width:5px;height:5px;border-radius:50%;background:#0f766e}
+.event-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px}
+.event-item:last-child{border-bottom:none}
+.event-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.event-del{border:none;background:none;color:#ccc;cursor:pointer;font-size:16px;margin-left:auto}
+.add-event-form{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.add-event-form input{border:1px solid #ddd;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;color:#333;font-family:sans-serif}
+.add-event-form input:focus{outline:none;border-color:#0f766e}
+.add-event-btn{padding:10px;background:#0f766e;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:bold;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div class="tab-bar">
+  <div class="tab on" id="tab-todo">📋 チェックリスト</div>
+  <div class="tab" id="tab-cal">📅 カレンダー</div>
+</div>
+
+<div class="pane on" id="pane-todo">
+  <div class="summary-grid">
+    <div class="stat"><div class="stat-num" id="total-count">0</div><div class="stat-label">総タスク数</div></div>
+    <div class="stat"><div class="stat-num" id="done-count">0</div><div class="stat-label">完了済み</div></div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-label"><span>達成率</span><span id="pct-text">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+  </div>
+
+  <div class="section-label">フィルター</div>
+  <div class="filter-row" id="cat-filter">
+    <div class="cat-chip on" data-cat="all">すべて</div>
+    <div class="cat-chip" data-cat="仕事">仕事</div>
+    <div class="cat-chip" data-cat="個人">個人</div>
+    <div class="cat-chip" data-cat="AI活用">AI活用</div>
+    <div class="cat-chip" data-cat="施設">施設</div>
+  </div>
+
+  <div class="section-label">タスクを追加</div>
+  <div class="add-area">
+    <div class="add-row">
+      <input type="text" id="task-input" placeholder="タスクを入力...">
+    </div>
+    <div class="add-row">
+      <input type="date" id="task-date" style="flex:1;color:#666">
+      <button class="add-btn" id="add-task-btn">追加</button>
+    </div>
+    <div class="cat-row" id="cat-select">
+      <div class="cat-chip on" data-sel="仕事">仕事</div>
+      <div class="cat-chip" data-sel="個人">個人</div>
+      <div class="cat-chip" data-sel="AI活用">AI活用</div>
+      <div class="cat-chip" data-sel="施設">施設</div>
+    </div>
+  </div>
+
+  <div class="section-label">タスク一覧</div>
+  <div id="task-list"></div>
+</div>
+
+<div class="pane" id="pane-cal">
+  <div class="cal-header">
+    <button class="cal-nav" id="prev-month">&#8249;</button>
+    <div class="cal-title" id="cal-title"></div>
+    <button class="cal-nav" id="next-month">&#8250;</button>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="section-label" id="selected-label">日付を選択してください</div>
+  <div id="event-list"></div>
+  <div class="add-event-form">
+    <input type="text" id="event-input" placeholder="予定を入力...">
+    <button class="add-event-btn" id="add-event-btn">この日に追加</button>
+  </div>
+</div>
+
+<script>
+var tasks = [];
+var events = {};
+
+// ✅ localStorage保存・読み込み
+function saveData() {
+  try {
+    localStorage.setItem('todo_tasks', JSON.stringify(tasks));
+    localStorage.setItem('todo_events', JSON.stringify(events));
+  } catch(e) {}
+}
+function loadData() {
+  try {
+    var t = localStorage.getItem('todo_tasks');
+    var e = localStorage.getItem('todo_events');
+    if (t) tasks = JSON.parse(t);
+    if (e) events = JSON.parse(e);
+  } catch(e) {}
+}
+loadData(); // 起動時に読み込み
+var selCat = '仕事';
+var filterCat = 'all';
+var today = new Date(); today.setHours(0,0,0,0);
+var calYear = today.getFullYear();
+var calMonth = today.getMonth();
+var selDate = null;
+
+var CATS = {
+  '仕事':  {bg:'#e0f2fe',color:'#0369a1'},
+  '個人':  {bg:'#f0fdf4',color:'#15803d'},
+  'AI活用':{bg:'#f5f3ff',color:'#7c3aed'},
+  '施設':  {bg:'#fff7ed',color:'#c2410c'}
+};
+var CAT_DOTS = {'仕事':'#0369a1','個人':'#15803d','AI活用':'#7c3aed','施設':'#c2410c'};
+
+function deadlineLabel(dateStr) {
+  if (!dateStr) return {text:'', cls:''};
+  var parts = dateStr.split('-');
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  d.setHours(0,0,0,0);
+  var diff = Math.round((d - today) / 86400000);
+  var m = (d.getMonth()+1)+'月'+d.getDate()+'日';
+  if (diff < 0) return {text:'期限切れ（'+m+'）', cls:'overdue'};
+  if (diff === 0) return {text:'今日が期限！', cls:'overdue'};
+  if (diff <= 3) return {text:'あと'+diff+'日（'+m+'）', cls:'soon'};
+  return {text:m+'まで', cls:''};
+}
+
+function updateProgress() {
+  var total = tasks.length;
+  var done = tasks.filter(function(t){return t.done;}).length;
+  var pct = total > 0 ? Math.round(done/total*100) : 0;
+  document.getElementById('total-count').textContent = total;
+  document.getElementById('done-count').textContent = done;
+  document.getElementById('pct-text').textContent = pct+'%';
+  document.getElementById('prog-fill').style.width = pct+'%';
+}
+
+function renderTasks() {
+  var list = document.getElementById('task-list');
+  var filtered = filterCat==='all' ? tasks : tasks.filter(function(t){return t.cat===filterCat;});
+  if (!filtered.length) { list.innerHTML='<div class="empty">タスクがありません</div>'; return; }
+  list.innerHTML = '';
+  filtered.forEach(function(task) {
+    var item = document.createElement('div');
+    item.className = 'task-item';
+    var c = CATS[task.cat] || {bg:'#f5f5f5',color:'#666'};
+    var dl = deadlineLabel(task.date);
+    var dlHtml = dl.text ? '<span class="task-deadline '+dl.cls+'">📅 '+dl.text+'</span>' : '';
+    item.innerHTML =
+      '<div class="task-top">' +
+        '<div class="task-check'+(task.done?' done':'')+'" data-id="'+task.id+'"></div>' +
+        '<div class="task-main">' +
+          '<div class="task-text'+(task.done?' done':'')+'">'+task.text+'</div>' +
+          '<div class="task-meta">' +
+            '<span class="task-cat" style="background:'+c.bg+';color:'+c.color+'">'+task.cat+'</span>' +
+            dlHtml +
+          '</div>' +
+        '</div>' +
+        '<button class="task-del" data-del="'+task.id+'">×</button>' +
+      '</div>';
+    list.appendChild(item);
+  });
+  list.querySelectorAll('.task-check').forEach(function(el) {
+    el.onclick = function() {
+      var id = parseInt(el.dataset.id);
+      var t = tasks.find(function(x){return x.id===id;});
+      if (t) { t.done=!t.done; renderTasks(); updateProgress(); saveData(); }
+    };
+  });
+  list.querySelectorAll('.task-del').forEach(function(el) {
+    el.onclick = function() {
+      var id = parseInt(el.dataset.del);
+      tasks = tasks.filter(function(x){return x.id!==id;});
+      renderTasks(); updateProgress(); saveData();
+    };
+  });
+}
+
+document.getElementById('add-task-btn').onclick = function() {
+  var inp = document.getElementById('task-input');
+  var dateInp = document.getElementById('task-date');
+  var text = inp.value.trim();
+  if (!text) return;
+  tasks.push({id:Date.now(), text:text, cat:selCat, done:false, date:dateInp.value});
+  inp.value=''; dateInp.value='';
+  renderTasks(); updateProgress(); saveData();
+};
+
+document.getElementById('task-input').onkeydown = function(e) {
+  if (e.key==='Enter') document.getElementById('add-task-btn').onclick();
+};
+
+document.getElementById('cat-filter').onclick = function(e) {
+  var chip = e.target.closest('.cat-chip');
+  if (!chip) return;
+  filterCat = chip.dataset.cat;
+  document.querySelectorAll('#cat-filter .cat-chip').forEach(function(c){c.classList.remove('on');});
+  chip.classList.add('on');
+  renderTasks();
+};
+
+document.getElementById('cat-select').onclick = function(e) {
+  var chip = e.target.closest('.cat-chip');
+  if (!chip) return;
+  selCat = chip.dataset.sel;
+  document.querySelectorAll('#cat-select .cat-chip').forEach(function(c){c.classList.remove('on');});
+  chip.classList.add('on');
+};
+
+function renderCal() {
+  var months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  document.getElementById('cal-title').textContent = calYear+'年 '+months[calMonth];
+  var grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  ['日','月','火','水','木','金','土'].forEach(function(d) {
+    var h = document.createElement('div'); h.className='cal-day-head'; h.textContent=d; grid.appendChild(h);
+  });
+  var first = new Date(calYear, calMonth, 1).getDay();
+  var days = new Date(calYear, calMonth+1, 0).getDate();
+  for (var i=0;i<first;i++) { var e=document.createElement('div'); e.className='cal-day empty-cell'; grid.appendChild(e); }
+  for (var d=1;d<=days;d++) {
+    (function(day) {
+      var cell = document.createElement('div');
+      var mm = String(calMonth+1).padStart(2,'0');
+      var dd = String(day).padStart(2,'0');
+      var dateStr = calYear+'-'+mm+'-'+dd;
+      var td = new Date(calYear,calMonth,day); td.setHours(0,0,0,0);
+      var isToday = td.getTime()===today.getTime();
+      var isSel = selDate===dateStr;
+      cell.className = 'cal-day'+(isToday?' today':'')+(isSel?' selected':'');
+      cell.textContent = day;
+      var hasEvent = events[dateStr]&&events[dateStr].length;
+      var hasDeadline = tasks.some(function(t){
+        return t.date && t.date === dateStr;
+      });
+      if (hasEvent||hasDeadline) { var dot=document.createElement('div'); dot.className='dot'; cell.appendChild(dot); }
+      cell.onclick = function() { selDate=dateStr; renderCal(); renderEvents(); };
+      grid.appendChild(cell);
+    })(d);
+  }
+}
+
+function renderEvents() {
+  var label = document.getElementById('selected-label');
+  var list = document.getElementById('event-list');
+  if (!selDate) { label.textContent='日付を選択してください'; list.innerHTML=''; return; }
+  var parts = selDate.split('-');
+  label.textContent = parts[0]+'年'+parts[1]+'月'+parts[2]+'日の予定・期限';
+  var html = '';
+  var evs = events[selDate] || [];
+  evs.forEach(function(ev, i) {
+    html += '<div class="event-item"><div class="event-dot" style="background:'+(CAT_DOTS[ev.cat]||'#0f766e')+'"></div><span style="flex:1">'+ev.text+'</span><button class="event-del" data-i="'+i+'">×</button></div>';
+  });
+  var dlTasks = tasks.filter(function(t) {
+    return t.date && t.date === selDate;
+  });
+  dlTasks.forEach(function(t) {
+    var c = CATS[t.cat]||{bg:'#f5f5f5',color:'#666'};
+    html += '<div class="event-item"><div class="event-dot" style="background:'+c.color+'"></div><span style="flex:1;color:#888">[期限] '+t.text+'</span></div>';
+  });
+  list.innerHTML = html || '<div class="empty">予定・期限がありません</div>';
+  list.querySelectorAll('.event-del').forEach(function(el) {
+    el.onclick = function() {
+      events[selDate].splice(parseInt(el.dataset.i),1);
+      renderEvents(); renderCal(); saveData();
+    };
+  });
+}
+
+document.getElementById('add-event-btn').onclick = function() {
+  if (!selDate) { alert('日付を選択してください'); return; }
+  var inp = document.getElementById('event-input');
+  var text = inp.value.trim();
+  if (!text) return;
+  if (!events[selDate]) events[selDate]=[];
+  events[selDate].push({text:text, cat:selCat});
+  inp.value='';
+  renderEvents(); renderCal(); saveData();
+};
+
+document.getElementById('event-input').onkeydown = function(e) {
+  if (e.key==='Enter') document.getElementById('add-event-btn').onclick();
+};
+
+document.getElementById('prev-month').onclick = function() {
+  calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCal();
+};
+document.getElementById('next-month').onclick = function() {
+  calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCal();
+};
+
+document.getElementById('tab-todo').onclick = function() {
+  document.getElementById('tab-todo').className='tab on';
+  document.getElementById('tab-cal').className='tab';
+  document.getElementById('pane-todo').className='pane on';
+  document.getElementById('pane-cal').className='pane';
+};
+document.getElementById('tab-cal').onclick = function() {
+  document.getElementById('tab-cal').className='tab on';
+  document.getElementById('tab-todo').className='tab';
+  document.getElementById('pane-cal').className='pane on';
+  document.getElementById('pane-todo').className='pane';
+  renderCal(); renderEvents();
+};
+
+renderTasks(); updateProgress(); renderCal();
+</script>
+</body>
+</html>
